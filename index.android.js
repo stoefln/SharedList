@@ -15,7 +15,9 @@ import {
   Image,
   ListView,
   AlertIOS,
-  Share
+  Share,
+  TouchableHighlight,
+  ActivityIndicator
 } from 'react-native';
 import 'firebase/auth';
 import 'firebase/database';
@@ -36,19 +38,6 @@ const firebaseConfig = {
 };
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 
-let RowComponent = React.createClass({
-  render: function() {
-    return (
-      <TouchableHighlight
-        underlayColor={'#eee'}
-        delayLongPress={500} {/* 500ms hold delay */}
-        style={{padding: 25, backgroundColor: "#F8F8F8", borderBottomWidth:1, borderColor: '#eee'}}
-      >
-        <Text>{this.props.data.text}</Text>
-      </TouchableHighlight>
-    );
-  }
-});
 
 export default class AwesomeProject extends Component {
 
@@ -61,7 +50,7 @@ export default class AwesomeProject extends Component {
     this.itemsRef = firebaseApp.database().ref('items');
 
     this.state = {
-      dataSource: ds.cloneWithRows([])
+      data: {}
     };
 
   }
@@ -69,61 +58,90 @@ export default class AwesomeProject extends Component {
   listenForItems(itemsRef) {
 
     var now = new Date().getTime();
+    this.setState({
+      showLoadingIndicator: true
+    });
 
-    itemsRef.on('value', (snap) => {
-      // get children as an array
-      var items = [];
+    itemsRef.orderByChild("order").on('value', (snap) => {
+
+      var data = {};
       snap.forEach((child) => {
         var checkedOn = child.val().checkedOn;
         if(typeof checkedOn == 'undefined' || checkedOn > now - 5 * 60 * 1000){
-          items.push({
-            title: child.val().title,
-            checkedOn: checkedOn,
-            _key: child.key
-          });
+          var key = child.key;
+          data[key] = child.val();
+          data[key].key = key;
         }
       });
 
-      var data = this.state.dataSource.cloneWithRows(items);
+      console.log("loaded data", data);
+
       this.setState({
-        dataSource: data,
-        order: Object.keys(data)
+        data: data,
+        order: Object.keys(data),
+        showLoadingIndicator: false,
       });
 
     }, (error) => {console.log(error)});
   }
 
-  _renderItem(item, sectionID, rowID, highlightRow) {
-      return (
-        <ListItem item={item} onPress={() => this.itemPress(item)} />
-      );
+  itemPress(item){
+      console.log("itemPress", item, typeof item.checkedOn, item.key);
+      item.checkedOn = typeof item.checkedOn == 'number' ? null : new Date().getTime();
+      firebaseApp.database().ref('items/' + item.key).set(item);
   }
 
-  itemPress(item){
-      console.log("itemPress", item._key, typeof item.checkedOn);
-      item.checkedOn = typeof item.checkedOn == 'number' ? null : new Date().getTime();
-      firebaseApp.database().ref('items/' + item._key).set(item);
+  onRowMoved(e) {
+    this.state.order.splice(e.to, 0, this.state.order.splice(e.from, 1)[0]);
+    this.forceUpdate();
+    let order = this.state.order;
+    for(var i=0; i<order.length; i++){
+      var key1 = order[i];
+      var item1 = this.state.data[key1];
+      item1.order = i;
+      firebaseApp.database().ref('items/' + key1).set(item1);
+    }
   }
+
   componentDidMount() {
       this.listenForItems(this.itemsRef);
   }
 
   addItem(text) {
-    this.itemsRef.push({ title: text, createdOn: new Date().getTime() })
+    let newItem = { title: text, createdOn: new Date().getTime(), order: this.getMinOrder() - 1 };
+    console.log("addItem", newItem);
+    this.itemsRef.push(newItem);
+  }
+
+  getMinOrder(){
+    let data = this.state.data;
+    var minOrder = 1000;
+    for(var i=0; i< data.length;i++){
+      var order = data[i].order;
+      console.log("order", order);
+      if(typeof order != 'undefined' && order < minOrder){
+        minOrder = order;
+      }
+    }
+    return minOrder;
   }
 
   render() {
     return (
       <View style={styles.container}>
         <StatusBar title="ToDo List" />
-        <SortableListView enableEmptySections={true} data={this.state.dataSource} order={this.state.order}
-          onRowMoved={e => {
-            this.state.order.splice(e.to, 0, this.state.order.splice(e.from, 1)[0]);
-            this.forceUpdate();
-          }}
-          renderRow={row => <RowComponent data={row} />} style={styles.listview} />
+        <SortableListView enableEmptySections={true} data={this.state.data} order={this.state.order}
+          onRowMoved={e => this.onRowMoved(e)}
+          renderRow={row => <ListItem item={row} onPress={() => this.itemPress(row)} />}
+          style={styles.listview} />
         <NewItemModal onAddItem={this.addItem.bind(this)} />
         <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" />
+        <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center'}}>
+          <ActivityIndicator
+              animating={this.state.showLoadingIndicator}
+              size="large"
+            />
+        </View>
       </View>
     );
   }

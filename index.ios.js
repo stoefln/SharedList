@@ -5,6 +5,8 @@
  */
 import * as firebase from 'firebase';
 import React, { Component } from 'react';
+
+
 import {
   AppRegistry,
   StyleSheet,
@@ -12,16 +14,19 @@ import {
   View,
   Image,
   ListView,
-  AlertIOS
+  AlertIOS,
+  Share, TouchableHighlight
 } from 'react-native';
+import 'firebase/auth';
+import 'firebase/database';
 
+const SortableListView = require('react-native-sortable-listview')
 const ActionButton = require('./components/ActionButton');
 const StatusBar = require('./components/StatusBar');
 const ListItem = require('./components/ListItem');
 const NewItemModal = require('./components/NewItemModal');
 const styles = require("./styles.js");
 const constants = styles.constants;
-
 const firebaseConfig = {
   apiKey: "AIzaSyBWSLByckX-dInb24sP3XBJFol5zaKaAcY",
   authDomain: "localnotes-ae435.firebaseapp.com",
@@ -32,47 +37,50 @@ const firebaseConfig = {
 const firebaseApp = firebase.initializeApp(firebaseConfig);
 
 
-
 export default class AwesomeProject extends Component {
-
 
   constructor(props) {
     super(props);
+
     var ds = new ListView.DataSource({
       rowHasChanged: (row1, row2) => row1 !== row2,
     });
     this.itemsRef = firebaseApp.database().ref('items');
 
     this.state = {
-      dataSource: ds.cloneWithRows([])
+      data: {}
     };
 
   }
 
   listenForItems(itemsRef) {
 
-    itemsRef.on('value', (snap) => {
+    var now = new Date().getTime();
+
+    itemsRef.orderByChild("order").on('value', (snap) => {
       // get children as an array
       var items = [];
+      var data = {};
       snap.forEach((child) => {
-        items.push({
-          title: child.val().title,
-          checkedOn: child.val().checkedOn,
-          _key: child.key
-        });
+        var checkedOn = child.val().checkedOn;
+        if(typeof checkedOn == 'undefined' || checkedOn > now - 5 * 60 * 1000){
+          items.push({
+            title: child.val().title,
+            checkedOn: checkedOn,
+            _key: child.key
+          });
+          data[child.key] = child.val();
+        }
       });
 
+      console.log("loaded data", data);
+
       this.setState({
-        dataSource: this.state.dataSource.cloneWithRows(items)
+        data: data,
+        order: Object.keys(data)
       });
 
     }, (error) => {console.log(error)});
-  }
-
-  _renderItem(item, sectionID, rowID, highlightRow) {
-      return (
-        <ListItem item={item} onPress={() => this.itemPress(item)} />
-      );
   }
 
   itemPress(item){
@@ -89,11 +97,31 @@ export default class AwesomeProject extends Component {
   }
 
   render() {
+    console.log("this.state.data2",this.state.data);
+    console.log("this.state.order2",this.state.order);
     return (
       <View style={styles.container}>
         <StatusBar title="ToDo List" />
-        <ListView enableEmptySections={true} dataSource={this.state.dataSource} renderRow={this._renderItem.bind(this)} style={styles.listview} />
+        <SortableListView enableEmptySections={true} data={this.state.data} order={this.state.order}
+          onRowMoved={e => {
+            this.state.order.splice(e.to, 0, this.state.order.splice(e.from, 1)[0]);
+            this.forceUpdate();
+            let order = this.state.order;
+            for(var i=0; i<order.length;i++){
+              var key1 = order[i];
+              var item1 = this.state.data[key1];
+              item1.order = i;
+              firebaseApp.database().ref('items/' + key1).set(item1);
+            }
+
+            //console.log("from: ", e.from, "to: ", e.to);
+            //console.log("key1: ", item1, "key2: ", item2);
+
+          }}
+          renderRow={row => <ListItem item={row} onPress={() => this.itemPress(row)} />}
+          style={styles.listview} />
         <NewItemModal onAddItem={this.addItem.bind(this)} />
+        <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" />
       </View>
     );
   }
