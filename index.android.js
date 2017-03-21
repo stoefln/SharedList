@@ -21,6 +21,8 @@ import {
 } from 'react-native';
 import 'firebase/auth';
 import 'firebase/database';
+import {PagerTabIndicator, IndicatorViewPager, PagerTitleIndicator, PagerDotIndicator} from 'rn-viewpager';
+
 
 const SortableListView = require('react-native-sortable-listview')
 const ActionButton = require('./components/ActionButton');
@@ -50,7 +52,9 @@ export default class AwesomeProject extends Component {
     this.itemsRef = firebaseApp.database().ref('items');
 
     this.state = {
-      data: {}
+      data: {},
+      doneItems: ds.cloneWithRows(['row 1', 'row 2']),
+      page: 'second'
     };
 
   }
@@ -65,19 +69,26 @@ export default class AwesomeProject extends Component {
     itemsRef.orderByChild("order").on('value', (snap) => {
 
       var data = {};
+      var doneItems = {};
       snap.forEach((child) => {
         var checkedOn = child.val().checkedOn;
+        var key = child.key;
         if(typeof checkedOn == 'undefined' || checkedOn > now - 5 * 60 * 1000){
-          var key = child.key;
           data[key] = child.val();
           data[key].key = key;
+        } else if (typeof checkedOn != 'undefined'){
+          doneItems[key] = child.val();
+          doneItems[key].key = key;
         }
       });
 
       console.log("loaded data", data);
+      console.log("old items", doneItems);
+      const ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
 
       this.setState({
         data: data,
+        doneItems: ds.cloneWithRows(doneItems),
         order: Object.keys(data),
         showLoadingIndicator: false,
       });
@@ -126,22 +137,45 @@ export default class AwesomeProject extends Component {
     return minOrder;
   }
 
+  sState(obj){
+    console.log(obj);
+    this.setState(obj);
+    console.log(this.state);
+  }
+
+  _renderTitleIndicator() {
+      return <PagerTitleIndicator titles={['To do', 'Done']} />;
+  }
+
   render() {
     return (
       <View style={styles.container}>
-        <StatusBar title="ToDo List" />
-        <SortableListView enableEmptySections={true} data={this.state.data} order={this.state.order}
-          onRowMoved={e => this.onRowMoved(e)}
-          renderRow={row => <ListItem item={row} onPress={() => this.itemPress(row)} />}
-          style={styles.listview} />
-        <NewItemModal onAddItem={this.addItem.bind(this)} />
-        <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" />
-        <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center'}}>
-          <ActivityIndicator
-              animating={this.state.showLoadingIndicator}
-              size="large"
-            />
-        </View>
+
+        <IndicatorViewPager
+         style={{flex:1, paddingTop:20, backgroundColor:'white'}}
+                   indicator={this._renderTitleIndicator()}
+               >
+
+          <View>
+            <StatusBar title="ToDo List" />
+            <SortableListView enableEmptySections={true} data={this.state.data} order={this.state.order}
+              onRowMoved={e => this.onRowMoved(e)}
+              renderRow={row => <ListItem item={row} onPress={() => this.itemPress(row)} />}
+              style={styles.listview} />
+            <NewItemModal onAddItem={this.addItem.bind(this)} />
+            <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" />
+            <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center'}}>
+              <ActivityIndicator
+                  animating={this.state.showLoadingIndicator}
+                  size="large"
+                />
+            </View>
+          </View>
+          <View>
+             <StatusBar title="Done List" />
+             <ListView dataSource={this.state.doneItems} renderRow={(row) => <ListItem item={row} onPress={() => this.itemPress(row)} />} />
+          </View>
+        </IndicatorViewPager>
       </View>
     );
   }
