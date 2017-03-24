@@ -1,8 +1,3 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- * @flow
- */
 import * as firebase from 'firebase';
 import React, { Component } from 'react';
 
@@ -30,6 +25,7 @@ const ActionButton = require('./components/ActionButton');
 const StatusBar = require('./components/StatusBar');
 const ListItem = require('./components/ListItem');
 const ListItemDone = require('./components/ListItemDone');
+const ListItemHeader = require('./components/ListItemHeader');
 const NewItemModal = require('./components/NewItemModal');
 
 const styles = require("./styles.js");
@@ -50,14 +46,15 @@ export default class AwesomeProject extends Component {
     super(props);
 
 
-    var ds = new ListView.DataSource({
+    this.ds = new ListView.DataSource({
       rowHasChanged: (row1, row2) => row1 !== row2,
+      sectionHeaderHasChanged: (s1, s2) => s1 !== s2
     });
     this.itemsRef = firebaseApp.database().ref('items');
 
     this.state = {
       data: {},
-      doneItems: ds.cloneWithRows(['row 1', 'row 2'])
+      doneItems: this.ds.cloneWithRowsAndSections({})
     };
 
   }
@@ -70,30 +67,50 @@ export default class AwesomeProject extends Component {
     });
 
     itemsRef.orderByChild("order").on('value', (snap) => {
-
       var data = {};
-      var doneItems = {};
       snap.forEach((child) => {
         var checkedOn = child.val().checkedOn;
         var key = child.key;
         if(typeof checkedOn == 'undefined' || checkedOn == null){
           data[key] = child.val();
           data[key].key = key;
-        } else {
-          doneItems[key] = child.val();
-          doneItems[key].key = key;
         }
       });
 
-      console.log("loaded data", data);
-      console.log("old items", doneItems);
-      const ds = new ListView.DataSource({rowHasChanged: (r1, r2) => r1 !== r2});
-
       this.setState({
         data: data,
-        doneItems: ds.cloneWithRows(doneItems),
         order: Object.keys(data),
         showLoadingIndicator: false,
+      });
+
+    }, (error) => {console.log(error)});
+
+    itemsRef.orderByChild("checkedOn").on('value', (snap) => {
+
+      var days = {};
+      var daysReverse = [];
+      snap.forEach((child) => {
+        daysReverse.unshift(child);
+      });
+
+      daysReverse.forEach((child) => {
+        var checkedOn = child.val().checkedOn;
+        var key = child.key;
+        console.log("checkedOn", checkedOn);
+        if(typeof checkedOn != 'undefined' && checkedOn != null){
+          let day = Moment(checkedOn).format('MMMM Do YYYY');
+          console.log(checkedOn, Moment(checkedOn).format('MMMM Do YYYY'));
+          if(!days[day]) {
+            days[day] = [];
+          }
+          var d = child.val()
+          d.key = key;
+          days[day].push(d);
+        }
+      });
+
+      this.setState({
+        doneItems: this.ds.cloneWithRowsAndSections(days)
       });
 
     }, (error) => {console.log(error)});
@@ -140,6 +157,11 @@ export default class AwesomeProject extends Component {
 
     return minOrder;
   }
+  renderSectionHeader(sectionData, category) {
+    return (
+      <Text style={{fontWeight: "700"}}>{category}</Text>
+    )
+  }
 
   _renderTitleIndicator() {
       return <PagerTitleIndicator titles={['To do', 'Done']} />;
@@ -169,7 +191,7 @@ export default class AwesomeProject extends Component {
           </View>
           <View>
              <StatusBar title="Done List" />
-             <ListView dataSource={this.state.doneItems} renderRow={(row) => <ListItemDone item={row} onPress={() => this.itemPress(row)} />} />
+             <ListView dataSource={this.state.doneItems} renderSectionHeader={(data, category) => <ListItemHeader category={category} />} renderRow={(row) => <ListItemDone item={row} onPress={() => this.itemPress(row)} />} />
           </View>
         </IndicatorViewPager>
       </View>
