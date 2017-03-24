@@ -1,16 +1,18 @@
 import React, {Component} from 'react';
 import ReactNative from 'react-native';
+import Moment from 'moment';
 
 const styles = require('../styles.js')
 const { View, TouchableHighlight, Text, Image } = ReactNative;
 
-class ListItem extends Component {
+class ListItemDone extends Component {
 
   constructor(props){
     super(props);
   }
 
   render() {
+    Moment.locale('de');
     var style = {width: 30, height: 30};
     //console.log("listitem", this.props.item, typeof this.props.item.checkedOn);
     if(typeof this.props.item.checkedOn == 'number'){
@@ -26,7 +28,10 @@ class ListItem extends Component {
         delayLongPress={500}
         {...this.props.sortHandlers}>
           <View style={styles.li}>
-            <Text style={styles.liText}>{this.props.item.title}</Text>
+            <View>
+              <Text style={styles.liText}>{this.props.item.title}</Text>
+              <Text>{Moment(this.props.item.checkedOn).calendar()}</Text>
+            </View>
             <Image source={require('../img/check.png')} style={style}/>
           </View>
       </TouchableHighlight>
@@ -34,4 +39,4 @@ class ListItem extends Component {
   }
 }
 
-module.exports = ListItem;
+module.exports = ListItemDone;

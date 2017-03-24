@@ -21,14 +21,17 @@ import {
 } from 'react-native';
 import 'firebase/auth';
 import 'firebase/database';
-import {PagerTabIndicator, IndicatorViewPager, PagerTitleIndicator, PagerDotIndicator} from 'rn-viewpager';
+import Moment from 'moment';
+import {IndicatorViewPager, PagerTitleIndicator} from 'rn-viewpager';
 
 
 const SortableListView = require('react-native-sortable-listview')
 const ActionButton = require('./components/ActionButton');
 const StatusBar = require('./components/StatusBar');
 const ListItem = require('./components/ListItem');
+const ListItemDone = require('./components/ListItemDone');
 const NewItemModal = require('./components/NewItemModal');
+
 const styles = require("./styles.js");
 const constants = styles.constants;
 const firebaseConfig = {
@@ -46,6 +49,7 @@ export default class AwesomeProject extends Component {
   constructor(props) {
     super(props);
 
+
     var ds = new ListView.DataSource({
       rowHasChanged: (row1, row2) => row1 !== row2,
     });
@@ -53,8 +57,7 @@ export default class AwesomeProject extends Component {
 
     this.state = {
       data: {},
-      doneItems: ds.cloneWithRows(['row 1', 'row 2']),
-      page: 'second'
+      doneItems: ds.cloneWithRows(['row 1', 'row 2'])
     };
 
   }
@@ -73,10 +76,10 @@ export default class AwesomeProject extends Component {
       snap.forEach((child) => {
         var checkedOn = child.val().checkedOn;
         var key = child.key;
-        if(typeof checkedOn == 'undefined' || checkedOn > now - 5 * 60 * 1000){
+        if(typeof checkedOn == 'undefined' || checkedOn == null){
           data[key] = child.val();
           data[key].key = key;
-        } else if (typeof checkedOn != 'undefined'){
+        } else {
           doneItems[key] = child.val();
           doneItems[key].key = key;
         }
@@ -126,21 +129,16 @@ export default class AwesomeProject extends Component {
 
   getMinOrder(){
     let data = this.state.data;
-    var minOrder = 1000;
-    for(var i=0; i< data.length;i++){
-      var order = data[i].order;
-      console.log("order", order);
+    var minOrder = 100000;
+
+    Object.keys(data).forEach(function(name, index){
+      var order = data[name].order;
       if(typeof order != 'undefined' && order < minOrder){
         minOrder = order;
       }
-    }
-    return minOrder;
-  }
+    });
 
-  sState(obj){
-    console.log(obj);
-    this.setState(obj);
-    console.log(this.state);
+    return minOrder;
   }
 
   _renderTitleIndicator() {
@@ -150,19 +148,17 @@ export default class AwesomeProject extends Component {
   render() {
     return (
       <View style={styles.container}>
-
         <IndicatorViewPager
-         style={{flex:1, paddingTop:20, backgroundColor:'white'}}
+          style={{flex:1, paddingTop:20, backgroundColor:'white'}}
                    indicator={this._renderTitleIndicator()}
                >
-
           <View>
             <StatusBar title="ToDo List" />
             <SortableListView enableEmptySections={true} data={this.state.data} order={this.state.order}
               onRowMoved={e => this.onRowMoved(e)}
               renderRow={row => <ListItem item={row} onPress={() => this.itemPress(row)} />}
               style={styles.listview} />
-            <NewItemModal onAddItem={this.addItem.bind(this)} />
+            <NewItemModal onAddItem={(text) => this.addItem(text)} />
             <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" />
             <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center'}}>
               <ActivityIndicator
@@ -173,7 +169,7 @@ export default class AwesomeProject extends Component {
           </View>
           <View>
              <StatusBar title="Done List" />
-             <ListView dataSource={this.state.doneItems} renderRow={(row) => <ListItem item={row} onPress={() => this.itemPress(row)} />} />
+             <ListView dataSource={this.state.doneItems} renderRow={(row) => <ListItemDone item={row} onPress={() => this.itemPress(row)} />} />
           </View>
         </IndicatorViewPager>
       </View>
