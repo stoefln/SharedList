@@ -157,11 +157,6 @@ export default class AwesomeProject extends Component {
 
     return minOrder;
   }
-  renderSectionHeader(sectionData, category) {
-    return (
-      <Text style={{fontWeight: "700"}}>{category}</Text>
-    )
-  }
 
   _renderTitleIndicator() {
       return <PagerTitleIndicator titles={['To do', 'Done']} />;
@@ -171,17 +166,17 @@ export default class AwesomeProject extends Component {
     return (
       <View style={styles.container}>
         <IndicatorViewPager
-          style={{flex:1, paddingTop:20, backgroundColor:'white'}}
-                   indicator={this._renderTitleIndicator()}
-               >
+          style={{flex:1, flexDirection: 'column-reverse', backgroundColor:'white'}}
+                   indicator={this._renderTitleIndicator()}>
           <View>
-            <StatusBar title="ToDo List" />
             <SortableListView enableEmptySections={true} data={this.state.data} order={this.state.order}
               onRowMoved={e => this.onRowMoved(e)}
               renderRow={row => <ListItem item={row} onPress={() => this.itemPress(row)} />}
               style={styles.listview} />
-            <NewItemModal onAddItem={(text) => this.addItem(text)} />
-            <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" />
+            <View style={{flexDirection: 'row', backgroundColor: '#F00'}}>
+              <NewItemModal onAddItem={(text) => this.addItem(text)} style={{flex: 1}}/>
+              <ActionButton onPress={() => Share.share({message: 'bla', title: 'title'})} title="Share List" style={{flex: 1}} />
+            </View>
             <View style={{position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center'}}>
               <ActivityIndicator
                   animating={this.state.showLoadingIndicator}
@@ -190,7 +185,6 @@ export default class AwesomeProject extends Component {
             </View>
           </View>
           <View>
-             <StatusBar title="Done List" />
              <ListView dataSource={this.state.doneItems} renderSectionHeader={(data, category) => <ListItemHeader category={category} />} renderRow={(row) => <ListItemDone item={row} onPress={() => this.itemPress(row)} />} />
           </View>
         </IndicatorViewPager>
